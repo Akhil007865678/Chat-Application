@@ -16,7 +16,6 @@ export default function Chat() {
   const navigate = useNavigate();
   const socket = useRef();
   const scrollRef = useRef();
-
   const [contacts, setContacts] = useState([]);
   const [currentChat, setCurrentChat] = useState(undefined);
   const [currentUser, setCurrentUser] = useState(undefined);
@@ -55,7 +54,7 @@ export default function Chat() {
   // Join socket room once currentUser is available
   useEffect(() => {
     if (currentUser && socket.current) {
-      socket.current.emit("add-user", currentUser.userId);
+      socket.current.emit("add-user", currentUser?.userId);
     }
   }, [currentUser]);
 
@@ -66,7 +65,7 @@ export default function Chat() {
         const response = await axios.get(`${process.env.REACT_APP_API}/auth/fetch-user`, {
           withCredentials: true,
         });
-        setContacts(response.data.filter((u) => u._id !== currentUser.userId));
+        setContacts(response.data.filter((u) => u._id !== currentUser?.userId));
       }
     };
     fetchContacts();
@@ -75,6 +74,9 @@ export default function Chat() {
   // Listen for incoming messages
   useEffect(() => {
     const handleReceiveMessage = ({ message, from }) => {
+      if (currentUser?.userId) {
+        setMessages((prev) => [...prev, { from: currentUser.userId, message, fromSelf: true }]);
+      }
       setMessages((prev) => [...prev, { from, message, fromSelf: false }]);
     };
     if (socket.current) {
@@ -86,14 +88,41 @@ export default function Chat() {
       }
     };
   }, []);
+  useEffect(() => {
+    const fetchMessages = async () => {
+      if (!currentUser?.userId || !currentChat?._id) return;
+      try {
+        const { data } = await axios.get(`${process.env.REACT_APP_API}/messages/getmsg`,{
+            params: {
+              from: currentUser.userId,
+              to: currentChat._id,
+            }
+          }
+        );
+        console.log("data: ",data);
+        setMessages(data);
+      } catch (error) {
+        console.error("Error fetching messages:", error);
+      }
+    };
+    fetchMessages();
+  }, [currentChat, currentUser]);
 
   // Handle sending message
-  const handleSendMsg = (message) => {
-    if (!currentChat._id || !message) return;
-
-    // Local update
-    setMessages((prev) => [...prev, { from: currentUser.userId, message, fromSelf: true }]);
-
+  const handleSendMsg = async(message) => {
+    if (!currentChat?._id || !message) return;
+    if (currentUser?.userId) {
+      setMessages((prev) => [...prev, { from: currentUser.userId, message, fromSelf: true }]);
+    }
+    try {
+      await axios.post(`${process.env.REACT_APP_API}/messages/addmsg`, {
+        from: currentUser.userId,
+        to: currentChat._id,
+        message,
+      });
+    } catch (error) {
+      console.error("Error saving message:", error);
+    }
     // Emit to server
     if (socket.current) {
       socket.current.emit(
@@ -106,7 +135,7 @@ export default function Chat() {
         }
       );
     }
-    setMsg(""); // Clear input
+    setMsg("");
   };
 
   const sendChat = (e) => {
@@ -147,7 +176,7 @@ export default function Chat() {
                   <div ref={scrollRef} key={uuidv4()}>
                     <div className={`message ${message.fromSelf ? "sended" : "recieved"}`}>
                       <div className="content">
-                        <p>{message.message}</p>
+                        <p>{message.content || message.message}</p>
                       </div>
                     </div>
                   </div>
