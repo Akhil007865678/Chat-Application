@@ -15,20 +15,31 @@ const app = express();
 const server = createServer(app);
 
 const onlineUsers = new Map();
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://chat-app-s4if.onrender.com' 
+];
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+}));
 
 const io = new Server(server, {
   cors: {
-    origin: ['http://localhost:3000', 'https://chat-app-s4if.onrender.com'],
+    origin: allowedOrigins,
     credentials: true,
   },
 });
 
 connectDB();
 
-app.use(cors({
-  origin: ['http://localhost:3000', 'https://chat-app-s4if.onrender.com'],
-  credentials: true
-}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
