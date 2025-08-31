@@ -26,7 +26,7 @@ const io = new Server(server, {
 connectDB();
 
 app.use(cors({
-  origin: 'http://localhost:3000',
+  origin: ['http://localhost:3000', 'https://chat-app-s4if.onrender.com'],
   credentials: true
 }));
 app.use(express.json());
