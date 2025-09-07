@@ -30,9 +30,11 @@ export default function Login() {
       navigate('/');
     } else {
       setError("Invalid Credentials");
+      alert("Invalid Credentials");
     }
   } catch (err) {
     setError("Oops something went wrong, Try again");
+    alert("Oops something went wrong, Try again");
     console.log(err);
   }
 };
