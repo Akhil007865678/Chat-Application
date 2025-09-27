@@ -8,86 +8,109 @@ export default function Contacts({ changeChat }) {
   const [currentUserName, setCurrentUserName] = useState(undefined);
   const [currentSelected, setCurrentSelected] = useState(undefined);
   const [contacts, setContacts] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
 
+  // Fetch current user
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchCurrentUser = async () => {
       try {
         const res = await axios.get(`${process.env.REACT_APP_API}/auth/user`, {
           withCredentials: true,
         });
-        console.log("user : ", res)
         if (res.data.success) {
           setCurrentUserName(res.data.user.userId);
         }
-        console.log(currentUserName);
       } catch (error) {
-        console.error("Error fetching data:", error);
+        console.error("Error fetching current user:", error);
       }
     };
-  
-    fetchData();
+    fetchCurrentUser();
   }, []);
 
+  // Fetch contacts
   useEffect(() => {
     const fetchContacts = async () => {
       try {
-        const response = await axios.get(`${process.env.REACT_APP_API}/auth/fetch-user`, {
-          withCredentials: true
+        const res = await axios.get(`${process.env.REACT_APP_API}/auth/fetch-user`, {
+          withCredentials: true,
         });
-        setContacts(response.data);
+        setContacts(res.data);
       } catch (error) {
-        console.error("Error fetching data:", error);
+        console.error("Error fetching contacts:", error);
       }
     };
     fetchContacts();
   }, []);
 
+  // Change selected contact
   const changeCurrentChat = (index, contact) => {
     setCurrentSelected(index);
     changeChat(contact);
   };
 
+  // Filter contacts based on search
+  const filteredContacts = contacts
+    .filter(contact => contact._id !== currentUserName)
+    .filter(contact =>
+      contact.userName.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
   return (
-    <>
-      {true && (
-        <Container>
-          <div className="brand">
-            <img src={Logo} alt="logo" />
-            <h3>Chats</h3>
+    <Container>
+      {/* Brand / Title */}
+      <div className="brand">
+        <img src={Logo} alt="logo" />
+        <h3>Chats</h3>
+      </div>
+
+      {/* Search Bar */}
+      <div className="search-container">
+        <input
+          type="text"
+          placeholder="Search users..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+
+      {/* Contacts List */}
+      <div className="contacts">
+        {filteredContacts.map((contact, index) => (
+          <div
+            key={contact._id}
+            className={`contact ${index === currentSelected ? "selected" : ""}`}
+            onClick={() => changeCurrentChat(index, contact)}
+          >
+            <div className="avatar">
+              <img
+                src={`data:image/svg+xml;base64,${contact.avatarImage}`}
+                alt="avatar"
+              />
+            </div>
+            <div className="username">
+              <h3>{contact.userName}</h3>
+            </div>
           </div>
-          <div className="contacts">
-            {contacts.filter(contact => contact._id !== currentUserName).map((contact, index) => {
-              return (
-                <div
-                  key={contact._id}
-                  className={`contact ${
-                    index === currentSelected ? "selected" : ""
-                  }`}
-                  onClick={() => changeCurrentChat(index, contact)}
-                >
-                  <div className="avatar">
-                    <img
-                      src={`data:image/svg+xml;base64,${contact.avatarImage}`}
-                      alt=""
-                    />
-                  </div>
-                  <div className="username">
-                    <h3>{contact.userName}</h3>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          
-        </Container>
-      )}
-    </>
+        ))}
+      </div>
+    </Container>
   );
 }
 
+// Styled-component container
 const Container = styled.div`
-  display: grid;
-  grid-template-rows: 10% 75% 15%;
-  overflow: hidden;
-  background-color: #080420;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  .contacts {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    
+    .selected {
+      background-color: #4e0eff;
+    }
+  }
 `;
