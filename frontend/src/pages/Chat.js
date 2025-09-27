@@ -12,87 +12,74 @@ import "./Chat.css";
 export default function Chat() {
   const navigate = useNavigate();
   const socket = useRef();
-  const scrollRef = useRef();
+  const messagesEndRef = useRef(null);
+  const chatMessagesRef = useRef(null);
+
   const [contacts, setContacts] = useState([]);
   const [currentChat, setCurrentChat] = useState(undefined);
   const [currentUser, setCurrentUser] = useState(undefined);
   const [messages, setMessages] = useState([]);
   const [msg, setMsg] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [showContacts, setShowContacts] = useState(true); // 👈 toggle for mobile
+  const [showContacts, setShowContacts] = useState(true);
 
+  // Fetch current user
   useEffect(() => {
     const fetchUser = async () => {
       try {
         const res = await axios.get(`${process.env.REACT_APP_API}/auth/user`, {
           withCredentials: true,
         });
-        if (res.data.success) {
-          setCurrentUser(res.data.user);
-        } else {
-          navigate("/login");
-        }
-      } catch (err) {
-        console.error("Error fetching user:", err);
+        if (res.data.success) setCurrentUser(res.data.user);
+        else navigate("/login");
+      } catch {
         navigate("/login");
       }
     };
     fetchUser();
   }, [navigate]);
 
+  // Socket connection
   useEffect(() => {
     socket.current = io(`${process.env.REACT_APP_API}`);
-    return () => {
-      socket.current.disconnect();
-    };
+    return () => socket.current.disconnect();
   }, []);
 
   useEffect(() => {
-    if (currentUser && socket.current) {
-      socket.current.emit("add-user", currentUser?.userId);
-    }
+    if (currentUser && socket.current)
+      socket.current.emit("add-user", currentUser.userId);
   }, [currentUser]);
 
+  // Fetch contacts
   useEffect(() => {
     const fetchContacts = async () => {
       if (currentUser) {
-        const response = await axios.get(
-          `${process.env.REACT_APP_API}/auth/fetch-user`,
-          { withCredentials: true }
-        );
-        setContacts(response.data.filter((u) => u._id !== currentUser?.userId));
+        const response = await axios.get(`${process.env.REACT_APP_API}/auth/fetch-user`, {
+          withCredentials: true,
+        });
+        setContacts(response.data.filter(u => u._id !== currentUser.userId));
       }
     };
     fetchContacts();
   }, [currentUser]);
 
+  // Handle receiving messages
   useEffect(() => {
     const handleReceiveMessage = ({ message, from }) => {
-      setMessages((prev) => [...prev, { from, message, fromSelf: false }]);
+      setMessages(prev => [...prev, { from, message, fromSelf: false }]);
     };
-    if (socket.current) {
-      socket.current.on("receive-message", handleReceiveMessage);
-    }
-    return () => {
-      if (socket.current) {
-        socket.current.off("receive-message", handleReceiveMessage);
-      }
-    };
+    socket.current?.on("receive-message", handleReceiveMessage);
+    return () => socket.current?.off("receive-message", handleReceiveMessage);
   }, []);
 
+  // Fetch messages with current chat
   useEffect(() => {
     const fetchMessages = async () => {
       if (!currentUser?.userId || !currentChat?._id) return;
       try {
-        const { data } = await axios.get(
-          `${process.env.REACT_APP_API}/messages/getmsg`,
-          {
-            params: {
-              from: currentUser.userId,
-              to: currentChat._id,
-            },
-          }
-        );
+        const { data } = await axios.get(`${process.env.REACT_APP_API}/messages/getmsg`, {
+          params: { from: currentUser.userId, to: currentChat._id },
+        });
         setMessages(data);
       } catch (error) {
         console.error("Error fetching messages:", error);
@@ -101,14 +88,12 @@ export default function Chat() {
     fetchMessages();
   }, [currentChat, currentUser]);
 
+  // Send message
   const handleSendMsg = async (message) => {
     if (!currentChat?._id || !message) return;
-    if (currentUser?.userId) {
-      setMessages((prev) => [
-        ...prev,
-        { from: currentUser.userId, message, fromSelf: true },
-      ]);
-    }
+    if (currentUser?.userId)
+      setMessages(prev => [...prev, { from: currentUser.userId, message, fromSelf: true }]);
+
     try {
       await axios.post(`${process.env.REACT_APP_API}/messages/addmsg`, {
         from: currentUser.userId,
@@ -119,35 +104,30 @@ export default function Chat() {
       console.error("Error saving message:", error);
     }
 
-    if (socket.current) {
-      socket.current.emit(
-        "send-message",
-        { to: currentChat._id, message, from: currentUser.userId },
-        (status) => {
-          if (status !== "ok") {
-            console.error("Failed to send message");
-          }
-        }
-      );
-    }
+    socket.current?.emit("send-message", {
+      to: currentChat._id,
+      message,
+      from: currentUser.userId,
+    });
+
     setMsg("");
   };
 
   const sendChat = (e) => {
     e.preventDefault();
-    if (msg.trim().length > 0) {
-      handleSendMsg(msg);
-    }
+    if (msg.trim()) handleSendMsg(msg);
   };
 
   const toggleEmojiPicker = () => setShowEmojiPicker(!showEmojiPicker);
+  const handleEmojiClick = (emojiObject) => setMsg(prev => prev + emojiObject.emoji);
 
-  const handleEmojiClick = (emojiObject) => {
-    setMsg((prev) => prev + emojiObject.emoji);
-  };
-
+  // Auto-scroll only if user near bottom
   useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
+    const chatMessages = chatMessagesRef.current;
+    if (!chatMessages) return;
+    const isNearBottom =
+      chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight < 50;
+    if (isNearBottom) messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   const handleChatChange = (chat) => {
@@ -158,13 +138,13 @@ export default function Chat() {
 
   const handleBackToContacts = () => {
     setCurrentChat(undefined);
-    setShowContacts(true); 
+    setShowContacts(true);
   };
 
   return (
     <div className="parent-box">
       <div className="container">
-        {/* Contacts list */}
+        {/* Contacts */}
         <div className={`contacts-panel ${showContacts ? "show" : "hide"}`}>
           <Contacts contacts={contacts} changeChat={handleChatChange} />
         </div>
@@ -175,25 +155,21 @@ export default function Chat() {
             <div className="chat-container">
               <div className="chat-header">
                 <button className="back-btn" onClick={handleBackToContacts}>
-                  ← Back
+                  ←
                 </button>
                 <h3>{currentChat.username || currentChat.name}</h3>
               </div>
-              <div className="chat-messages">
+              <div className="chat-messages" ref={chatMessagesRef}>
                 {messages.map((message) => (
-                  <div ref={scrollRef} key={uuidv4()}>
-                    <div
-                      className={`message ${
-                        message.fromSelf ? "sended" : "recieved"
-                      }`}
-                    >
-                      <div className="content">
-                        <p>{message.content || message.message}</p>
-                      </div>
+                  <div key={uuidv4()} className={`message ${message.fromSelf ? "sended" : "recieved"}`}>
+                    <div className="content">
+                      <p>{message.content || message.message}</p>
                     </div>
                   </div>
                 ))}
+                <div ref={messagesEndRef} />
               </div>
+
               <div className="chat-input-container">
                 <div className="button-container">
                   <div className="emoji">
@@ -208,24 +184,19 @@ export default function Chat() {
                 <form className="input-container" onSubmit={sendChat}>
                   <input
                     type="text"
-                    placeholder="Type your message here"
+                    placeholder="Type a message"
                     value={msg}
-                    onChange={(e) => setMsg(e.target.value)}
+                    onChange={e => setMsg(e.target.value)}
                   />
-                  <button type="submit">
-                    <IoMdSend />
-                  </button>
+                  <button type="submit"><IoMdSend /></button>
                 </form>
               </div>
             </div>
           </div>
         )}
 
-        {/* Placeholder when no chat */}
         {!showContacts && !currentChat && (
-          <div
-            style={{ color: "white", textAlign: "center", paddingTop: "20%" }}
-          >
+          <div style={{ color: "white", textAlign: "center", paddingTop: "20%" }}>
             Select a user to start chatting
           </div>
         )}
