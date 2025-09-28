@@ -7,10 +7,10 @@ import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import dotenv from 'dotenv';
 
 const cookieOptions = {
-    httpOnly: false,
-    secure: false,
-    sameSite: 'Lax',  
-    maxAge: 60 * 60 * 1000 
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "None",
+  maxAge: 60 * 60 * 1000,
 };
 
 
