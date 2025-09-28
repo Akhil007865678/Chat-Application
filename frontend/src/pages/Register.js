@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import axios from "axios";
 import styled from "styled-components";
 import { useNavigate, Link } from "react-router-dom";
@@ -7,43 +7,66 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 export default function Register() {
-    const [userName, setuserName] = useState('');
-    const [password, setpassword] = useState('');
-    const [message, setMessage] = useState('');
+  const [userName, setUserName] = useState('');
+  const [password, setPassword] = useState('');
+  const [profileImage, setProfileImage] = useState(null); // New state for image
+  const [message, setMessage] = useState('');
 
-    const handleSignUp = async (e) => {
+  const handleSignUp = async (e) => {
     e.preventDefault();
 
     try {
-        const data = { userName, password };
+      // Use FormData to send file + other fields
+      const formData = new FormData();
+      formData.append("userName", userName);
+      formData.append("password", password);
+      if (profileImage) formData.append("profileImage", profileImage);
 
-        const response = await axios.post(`${process.env.REACT_APP_API}/auth/signup`, data, {
-            headers: {
-                "Content-Type": "application/json"
-            }
-        });
-        setMessage(response.data.message);
-        toast.success(response.data.message);
+      const response = await axios.post(`${process.env.REACT_APP_API}/auth/signup`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data"
+        }
+      });
+
+      setMessage(response.data.message);
+      toast.success(response.data.message);
     } catch (error) {
-        const errMsg = error.response?.data?.error || "Error in SignUp";
-        setMessage(errMsg);
-        toast.error(errMsg);
+      const errMsg = error.response?.data?.error || "Error in SignUp";
+      setMessage(errMsg);
+      toast.error(errMsg);
     }
-};
+  };
 
   return (
     <>
       <FormContainer>
-        <form action="" onSubmit={(event) => handleSignUp(event)}>
+        <form onSubmit={handleSignUp}>
           <div className="brand">
             <img src={Logo} alt="logo" />
             <h1>Chats</h1>
           </div>
-          <input type='text' className='signUp_Inputs_inp' value={userName} onChange={(e) => setuserName(e.target.value)} placeholder='User Name' />
-          <input type='password' className='signUp_Inputs_inp' value={password} onChange={(e) => setpassword(e.target.value)} placeholder='Password'/>          
-          <button type="submit" onClick={handleSignUp}>Create User</button>
+          <input
+            type="text"
+            className="signUp_Inputs_inp"
+            value={userName}
+            onChange={(e) => setUserName(e.target.value)}
+            placeholder="User Name"
+          />
+          <input
+            type="password"
+            className="signUp_Inputs_inp"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password"
+          />
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setProfileImage(e.target.files[0])} // Save selected file
+          />
+          <button type="submit">Create User</button>
           <span>
-            Already have an account ? <Link to="/login">Login.</Link>
+            Already have an account? <Link to="/login">Login.</Link>
           </span>
         </form>
       </FormContainer>
