@@ -1,36 +1,71 @@
 import User from '../models/userModel.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import mongoose from 'mongoose';
-
+import cloudinary from 'cloudinary';
+import multer from 'multer';
+import { CloudinaryStorage } from 'multer-storage-cloudinary';
+import dotenv from 'dotenv';
 
 const cookieOptions = {
-    httpOnly: true,                      
-    secure: process.env.NODE_ENV === 'production',  
-    sameSite: 'none',                   
-    maxAge: 24 * 60 * 60 * 1000         
+    httpOnly: false,
+    secure: false,
+    sameSite: 'Lax',  
+    maxAge: 60 * 60 * 1000 
 };
 
 
-const signUp = async (req, res) => {
-  try {
-    const {userName, password} = req.body;
-    const isExist = await User.findOne({ userName });
-    if (isExist) {
-      return res.status(400).json({ error: 'Username already exists.' });
+dotenv.config();
+
+cloudinary.v2.config({
+  cloud_name: process.env.CLOUD_NAME,
+  api_key: process.env.API_KEY,
+  api_secret: process.env.API_SECRET,
+});
+
+// Cloudinary storage for profile image
+const imageStorage = new CloudinaryStorage({
+  cloudinary: cloudinary.v2,
+  params: {
+    folder: 'profile_images',
+    resource_type: 'image',
+    format: async () => 'jpg',
+  },
+});
+
+const uploadImage = multer({ storage: imageStorage });
+
+// Signup controller with image
+export const signUp = (req, res) => {
+  uploadImage.single('profileImage')(req, res, async (err) => {
+    if (err) {
+      return res.status(500).json({ error: 'Error uploading image' });
     }
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const user = new User({
-      userName,
-      password: hashedPassword,
-    });
-    await user.save();
-    res.status(201).json({ message: 'User registered successfully', data: user });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Server error.' });
-  }
+
+    try {
+      const { userName, password } = req.body;
+
+      const isExist = await User.findOne({ userName });
+      if (isExist) {
+        return res.status(400).json({ error: 'Username already exists.' });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      const user = new User({
+        userName,
+        password: hashedPassword,
+        profileImage: req.file ? req.file.path : null, // Save Cloudinary URL
+      });
+
+      await user.save();
+      res.status(201).json({ message: 'User registered successfully', data: user });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Server error.' });
+    }
+  });
 };
+
 
 const signIn = async (req, res) => {
   try {
