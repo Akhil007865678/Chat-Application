@@ -5,7 +5,7 @@ A **real-time chat application** built with **Node.js**, **Express**, and **Sock
 ---
 
 ## 🚀 Features
-
+ 
 - Real-time messaging using **Socket.IO**
 - Efficiently manages user connections and events
 - User-friendly chat interface
